@@ -30,10 +30,6 @@ boardheight = 0
 
 
 
-'''
-    Ever object square that is adjacent to another square
-'''
-adjacencies = {}
 
 class board_object():
     def __init__(self, x, y, name, facing='', status=''):
@@ -55,7 +51,7 @@ def checkForEndCondition(player,thingsOnTheBoard, KB):
 def add_precept(KB, playerObject, boardObjects):
 
     squareValue = ['','','','visited', '']
-    for adjSquare in adjacencies[playerObject.position]:
+    for adjSquare in KB['adjacencies'][playerObject.position]:
         for obj in boardObjects:
             if obj.position == adjSquare :
                 if obj.obj_type == 'Wumpus' and KB['scream'] == '' :
@@ -130,7 +126,7 @@ def applyMove(player,move, n, KB,boardObjects):
 
 def provideHint(KB, player):
     #get things you experience in this room:
-    adjacent = adjacencies[player.position]
+    adjacent = KB['adjacencies'][player.position]
     adjacent_display = []
     for a in adjacent:
         listOfKBKeys = KB.keys()
@@ -168,10 +164,12 @@ def main():
     #print(gameState)
 
     '''
-    Knowledge base will be of the form 'pos_x,pos_y' : ['Stench','Pit','Gold'] 
+    Knowledge base will be of the form 'pos_x,pos_y' : ['Stench','Pit','Gold','visited'] 
     
     '''
     KB = {}
+
+    KB.update( {'adjacencies' : {}} )
 
     KB.update( {'scream' : ''})
     KB.update( {'Armed' : 'Player'})                                                      
@@ -186,15 +184,11 @@ def main():
                     boardObjects.append( board_object(y+1, x+1,'Pit') )
                 elif(gameState[x][y] == 'G'):
                     boardObjects.append( board_object(y+1, x+1,'Gold') )
-                adjacencies.update ( { coordinatesAsString : calculateAdjacenies(y+1, x+1, len(gameState)) } )
+                KB['adjacencies'].update ( { coordinatesAsString : calculateAdjacenies(y+1, x+1, len(gameState)) } )
     
     #Then we want to add the person to the game, at position 1,1
     playerObject = board_object(1,1,'Player','East', 'Armed')
     KB = add_precept(KB, playerObject, boardObjects)
-
-    #playerObject = board_object(1,2,'Player','East')
-    #playerObject = board_object(2,1,'Player','East')
-    #playerObject = board_object(2,3,'Player','East')
 
     endGameVerbage = ''
 
@@ -213,6 +207,9 @@ def main():
 
     #print(KB)
 
+    file = open("./output","w+") 
+    file.write(str(KB))
+    file.close()
 
     
 
