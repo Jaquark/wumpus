@@ -20,7 +20,7 @@ directions_rotate = { 'R' : {'East' : 'South',
                   'South' : 'West',
                   'West' : 'North'},
                   'L' : {'East' : 'North',
-                  'North' : 'west',
+                  'North' : 'West',
                   'South' : 'East',
                   'West' : 'South'}}
 
@@ -36,29 +36,29 @@ boardheight = 0
 adjacencies = {}
 
 class board_object():
-    def __init__(self, x, y, name, facing=''):
+    def __init__(self, x, y, name, facing='', status=''):
         self.position = '{0},{1}'.format(x,y)
         self.obj_type = name
         self.facing = facing
+        self.status = status
 
-def checkForEndCondition(player,thingsOnTheBoard):
+def checkForEndCondition(player,thingsOnTheBoard, KB):
     for thing in thingsOnTheBoard:
         if player.position == thing.position:
             if thing.obj_type == 'Gold':
                 return 'found the Gold'
             if thing.obj_type == 'Pit':
                 return 'fell into an endless pit. Some say you are still falling to this day. Better luck next time'
-            if thing.obj_type == 'Wumpus':
+            if thing.obj_type == 'Wumpus' and KB['scream'] == '' :
                 return 'were eaten alive.'
     return ''
 def add_precept(KB, playerObject, boardObjects):
 
-    squareValue = ['','','','visited']
-    
+    squareValue = ['','','','visited', '']
     for adjSquare in adjacencies[playerObject.position]:
         for obj in boardObjects:
-            if obj.position == adjSquare:
-                if obj.obj_type == 'Wumpus':
+            if obj.position == adjSquare :
+                if obj.obj_type == 'Wumpus' and KB['scream'] == '' :
                     squareValue[0] = 'Stench'
                 if obj.obj_type == 'Pit':
                     squareValue[1] = 'Breeze'
@@ -89,7 +89,7 @@ def displayPlayerDetails(player):
     print('what would you like to do? Please enter a command {0}'.format(possible_moves))
 
 
-def applyMove(player,move, n):
+def applyMove(player,move, n, KB,boardObjects):
     #check if move is bounded
     if move == 'F':
         valueToAdd = directions_f[player.facing].split(',')
@@ -104,20 +104,46 @@ def applyMove(player,move, n):
     if move == 'R' or move == 'L':
         player.facing = directions_rotate[move][player.facing]
     if move == 'S':
-        print('You shot the arrow, but because this is lazy at the moment, it does nothing.')
-    
-    return player
+        if(KB['Armed'] == 'Player'):
+            wumpus = None
+            for obj in boardObjects:
+                if obj.obj_type == 'Wumpus':
+                    wumpus = obj
+            direction = player.facing
+            playerPos = player.position.split(',')
+            wumpusPos = wumpus.position.split(',')
+            if direction == 'East' and playerPos[1] == wumpusPos[1] and playerPos[0] < wumpusPos[0]:
+                KB['scream'] = 'wumpus'
+            if direction == 'West' and playerPos[1] == wumpusPos[1] and playerPos[0] > wumpusPos[0]:
+                KB['scream'] = 'wumpus'
+            if direction == 'North' and playerPos[0] == wumpusPos[0] and playerPos[1] < wumpusPos[1]:
+                KB['scream'] = 'wumpus'
+            if direction == 'South' and playerPos[0] == wumpusPos[0] and playerPos[1] > wumpusPos[1]:
+                KB['scream'] = 'wumpus'
+            KB['Armed'] = 'No one'
+            print('You hear a scream off in the distance')
+        else:
+            print("You've already fired your arrow.")
+       #get the direction the player is facing
+       
+    return player,KB
 
 def provideHint(KB, player):
     #get things you experience in this room:
+    adjacent = adjacencies[player.position]
+    adjacent_display = []
+    for a in adjacent:
+        listOfKBKeys = KB.keys()
+        if not( a in listOfKBKeys) :
+            adjacent_display.append( '{0}'.format(a) )
     for verb in KB[player.position]:
         #get adjacent squares that have not been visited
         if verb == 'Glitter':
             print('You are right on top of the gold')
         if verb == 'Stench': #yeah, I know    
-            print('Be careful, it smells like a high protein diet primarily made of spelunkers, that means the Wumpus is nearby, hiding in LIST_OF_PLACES_THE_WUMPUS_MAY_BE')
+            print('Be careful, it smells like a high protein diet primarily made of spelunkers, that means the Wumpus is nearby, hiding in {0}'.format(adjacent_display))
         if verb == 'Breeze':
-            print('It\'s breezy in here; there may be a pit in LIST_OF_PLACES_THE_PIT_MAY_BE')    
+            print('It\'s breezy in here; there may be a pit in {0}'.format(adjacent_display))    
 
 
 
@@ -147,12 +173,15 @@ def main():
     '''
     KB = {}
 
+    KB.update( {'scream' : ''})
+    KB.update( {'Armed' : 'Player'})                                                      
+
     #first we need to populate the entire knowledge base with Socrates definition of true knowledge
     for x in range(0,len(gameState)) :
         for y in range(0,len(gameState[x])):
                 coordinatesAsString = '{0},{1}'.format(y+1, x+1)
                 if( gameState[x][y] == 'W'):
-                    boardObjects.append( board_object(y+1, x+1,'Wumpus') )
+                    boardObjects.append( board_object(y+1, x+1,'Wumpus' ,'') )
                 elif(gameState[x][y] == 'P'):
                     boardObjects.append( board_object(y+1, x+1,'Pit') )
                 elif(gameState[x][y] == 'G'):
@@ -160,7 +189,8 @@ def main():
                 adjacencies.update ( { coordinatesAsString : calculateAdjacenies(y+1, x+1, len(gameState)) } )
     
     #Then we want to add the person to the game, at position 1,1
-    playerObject = board_object(1,1,'Player','East')
+    playerObject = board_object(1,1,'Player','East', 'Armed')
+    KB = add_precept(KB, playerObject, boardObjects)
 
     #playerObject = board_object(1,2,'Player','East')
     #playerObject = board_object(2,1,'Player','East')
@@ -171,8 +201,8 @@ def main():
     while(endGameVerbage == ''):
         displayPlayerDetails(playerObject)
         move = raw_input()
-        playerObject = applyMove(playerObject, move, boardwidth)
-        endGameVerbage = checkForEndCondition(playerObject,boardObjects)
+        playerObject,KB = applyMove(playerObject, move, boardwidth, KB,boardObjects)
+        endGameVerbage = checkForEndCondition(playerObject,boardObjects, KB)
         KB = add_precept(KB, playerObject, boardObjects)
         provideHint(KB,playerObject)
 
